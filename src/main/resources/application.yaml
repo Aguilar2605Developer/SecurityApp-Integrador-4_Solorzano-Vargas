@@ -1,11 +1,10 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:securitydb
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: ""
+    url: jdbc:postgresql://ep-falling-wave-ai8pan4a-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require
+    driver-class-name: org.postgresql.Driver
+    username: neondb_owner
+    password: npg_usIZ1fSN2qBJ
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: update
     show-sql: true
