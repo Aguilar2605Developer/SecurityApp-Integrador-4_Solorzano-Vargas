@@ -1,4 +1,10 @@
 package com.pucetec.securitydev.repository
 
-class HotSpotRepository {
+import com.pucetec.securitydev.entity.HotSpot
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.stereotype.Repository
+
+@Repository
+interface HotSpotRepository : JpaRepository<HotSpot, Long> {
+
 }
