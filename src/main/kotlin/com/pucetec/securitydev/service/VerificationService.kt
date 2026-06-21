@@ -18,24 +18,16 @@ class VerificationService(
 
     // Registra una nueva verificación o alerta de seguridad enviada desde el campus
     fun createVerification(request: VerificationRequest): VerificationResponse {
-        // 1. Buscamos primero el usuario real en la base de datos usando el ID del request
         val user = userRepository.findById(request.userId).orElseThrow {
             RuntimeException("Estudiante no encontrado con ID: ${request.userId}")
         }
 
-        // 2. Buscamos primero el punto caliente real en la base de datos usando el ID del request
         val hotSpot = hotSpotRepository.findById(request.hotSpotId).orElseThrow {
             RuntimeException("Punto de peligro no encontrado con ID: ${request.hotSpotId}")
         }
 
-        // 3. Traduce los datos básicos PERO pasándole de una vez el 'user' y el 'hotSpot' encontrados
-        // Nota: Si tu VerificationMapper.toEntity no acepta estos parámetros extras, mira el paso de abajo ⬇️
         val entity = verificationMapper.toEntity(request, user, hotSpot)
-
-        // 4. Guarda el registro de verificación final en la base de datos de Neon Cloud
         val savedEntity = verificationRepository.save(entity)
-
-        // 5. Retorna la respuesta formateada lista para ser consumida en el frontend
         return verificationMapper.toResponse(savedEntity)
     }
 
@@ -64,7 +56,7 @@ class VerificationService(
             RuntimeException("Punto de peligro no encontrado con ID: ${request.hotSpotId}")
         }
 
-        val updatedEntity = verificationMapper.toEntity(request, user, hotSpot)
+        val updatedEntity = verificationMapper.toEntity(request, user, hotSpot, id)
         val savedEntity = verificationRepository.save(updatedEntity)
         return verificationMapper.toResponse(savedEntity)
     }
