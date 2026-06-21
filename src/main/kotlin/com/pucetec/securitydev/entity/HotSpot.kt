@@ -26,5 +26,6 @@ class HotSpot(
 
     @ManyToOne
     @JoinColumn(name = "user_id") // Esta anotación le dice a la base de datos cómo se llamará la columna de unión (FK)
+    // El signo de pregunta nos dice que el valor puede llegar vacio
     val users: Users? = null
 )
