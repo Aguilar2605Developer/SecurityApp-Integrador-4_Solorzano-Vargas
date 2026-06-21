@@ -14,9 +14,11 @@ class VerificationMapper {
     fun toEntity(
         request: VerificationRequest,
         user: Users,
-        hotSpot: HotSpot
+        hotSpot: HotSpot,
+        id: Long = 0L
     ): Verification {
         return Verification(
+            id = id,
             hotSpot = hotSpot,
             status = request.status,
             user = user

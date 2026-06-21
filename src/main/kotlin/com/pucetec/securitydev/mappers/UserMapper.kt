@@ -9,8 +9,9 @@ import org.springframework.stereotype.Component
 class UserMapper {
 
     // 1. De la App a la Base de Datos: Procesa los datos incluyendo el password
-    fun toEntity(request: UserRequest): Users {
+    fun toEntity(request: UserRequest, id: Long = 0L): Users {
         return Users(
+            id = id,
             name = request.name,
             email = request.email,
             number = request.number,

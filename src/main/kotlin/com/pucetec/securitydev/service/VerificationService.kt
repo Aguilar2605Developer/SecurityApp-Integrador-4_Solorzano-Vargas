@@ -51,4 +51,28 @@ class VerificationService(
         val verification = verificationRepository.findById(id).orElse(null) ?: return null
         return verificationMapper.toResponse(verification)
     }
+
+    // Actualiza una verificación existente
+    fun updateVerification(id: Long, request: VerificationRequest): VerificationResponse? {
+        val existing = verificationRepository.findById(id).orElse(null) ?: return null
+
+        val user = userRepository.findById(request.userId).orElseThrow {
+            RuntimeException("Estudiante no encontrado con ID: ${request.userId}")
+        }
+
+        val hotSpot = hotSpotRepository.findById(request.hotSpotId).orElseThrow {
+            RuntimeException("Punto de peligro no encontrado con ID: ${request.hotSpotId}")
+        }
+
+        val updatedEntity = verificationMapper.toEntity(request, user, hotSpot)
+        val savedEntity = verificationRepository.save(updatedEntity)
+        return verificationMapper.toResponse(savedEntity)
+    }
+
+    // Elimina una verificación por su ID
+    fun deleteVerification(id: Long): Boolean {
+        if (!verificationRepository.existsById(id)) return false
+        verificationRepository.deleteById(id)
+        return true
+    }
 }
