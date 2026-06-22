@@ -1,5 +1,6 @@
-// HotSpotResponse.kt
 package com.pucetec.securitydev.dto
+
+import java.time.LocalDateTime
 
 data class HotSpotResponse(
     val id: Long,
@@ -8,5 +9,8 @@ data class HotSpotResponse(
     val modality: String,
     val description: String,
     val userId: Long?,
-    val username: String?
+    val username: String?,
+    val active: Boolean,
+    val expiresAt: LocalDateTime,
+    val peopleInvolved: Int
 )

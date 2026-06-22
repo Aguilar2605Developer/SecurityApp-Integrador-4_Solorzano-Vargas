@@ -5,6 +5,7 @@ import com.pucetec.securitydev.dto.HotSpotResponse
 import com.pucetec.securitydev.entity.HotSpot
 import com.pucetec.securitydev.entity.Users
 import org.springframework.stereotype.Component
+import java.time.LocalDateTime
 
 @Component
 class HotSpotMapper {
@@ -16,6 +17,9 @@ class HotSpotMapper {
             longitude = request.longitude,
             modality = request.modality,
             description = request.description,
+            peopleInvolved = request.peopleInvolved,
+            active = true,
+            expiresAt = LocalDateTime.now().plusHours(request.durationHours),
             users = users
         )
     }
@@ -28,7 +32,10 @@ class HotSpotMapper {
             modality = hotSpot.modality,
             description = hotSpot.description,
             userId = hotSpot.users?.id,
-            username = hotSpot.users?.name
+            username = hotSpot.users?.name,
+            active = hotSpot.active,
+            expiresAt = hotSpot.expiresAt,
+            peopleInvolved = hotSpot.peopleInvolved
         )
     }
 }

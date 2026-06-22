@@ -1,4 +1,3 @@
-// HotSpotRequest.kt
 package com.pucetec.securitydev.dto
 
 data class HotSpotRequest(
@@ -6,5 +5,7 @@ data class HotSpotRequest(
     val longitude: Double,
     val modality: String = "",
     val description: String = "",
-    val userId: Long
+    val userId: Long,
+    val durationHours: Long = 24,
+    val peopleInvolved: Int
 )

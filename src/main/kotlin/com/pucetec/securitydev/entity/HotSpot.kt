@@ -1,6 +1,7 @@
 package com.pucetec.securitydev.entity
 
 import jakarta.persistence.*
+import java.time.LocalDateTime
 
 @Entity
 @Table(name = "hotspot")
@@ -14,7 +15,14 @@ class HotSpot(
     val modality: String = "",
     val description: String = "",
 
-    @ManyToOne(fetch = FetchType.LAZY) // Lazy evita errores de carga recursiva
-    @JoinColumn(name = "user_id", nullable = true) // nullable = true permite que el hotspot sea sin usuario
+
+    val peopleInvolved: Int = 1,
+
+    val active: Boolean = true,
+
+    val expiresAt: LocalDateTime = LocalDateTime.now().plusHours(24),
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = true)
     val users: Users? = null
 )
