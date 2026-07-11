@@ -23,3 +23,5 @@ spring:
 app:
   frontend:
     url: http://localhost:8100
+  admin:
+    email: aguilarsolor24@gmail.com

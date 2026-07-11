@@ -44,8 +44,8 @@ class LocationShareService(
     }
 
     fun getByShareId(shareId: String): LocationShareResponse {
-        val share = locationShareRepository.findByShareIdAndActiveTrue(shareId)
-            ?: throw LocationShareNotFoundException("Compartir ubicación no encontrado o expirado: $shareId")
+        val share = locationShareRepository.findByShareId(shareId)
+            ?: throw LocationShareNotFoundException("Compartir ubicación no encontrado: $shareId")
         return locationShareMapper.toResponse(share)
     }
 

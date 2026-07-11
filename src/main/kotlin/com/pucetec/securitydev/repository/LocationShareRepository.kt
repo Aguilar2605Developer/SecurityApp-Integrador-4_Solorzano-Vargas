@@ -8,5 +8,8 @@ import java.time.LocalDateTime
 @Repository
 interface LocationShareRepository : JpaRepository<LocationShare, Long> {
     fun findByShareIdAndActiveTrue(shareId: String): LocationShare?
+    fun findByShareId(shareId: String): LocationShare?
     fun findByActiveTrueAndExpiresAtBefore(dateTime: LocalDateTime): List<LocationShare>
+    fun deleteByUsersId(userId: Long)
+    fun countByActiveTrue(): Long
 }

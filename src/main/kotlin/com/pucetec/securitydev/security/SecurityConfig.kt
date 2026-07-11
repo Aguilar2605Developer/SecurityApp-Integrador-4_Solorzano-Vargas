@@ -36,22 +36,18 @@ class SecurityConfig(private val jwtFilter: JwtFilter) {
             .csrf { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests {
-                // Rutas públicas que no requieren token
                 it.requestMatchers(
                     "/api/users/register",
                     "/api/auth/login"
                 ).permitAll()
 
-                // GET público — cualquiera puede ver las alertas activas en el mapa sin login
                 it.requestMatchers(HttpMethod.GET, "/api/hotspots", "/api/hotspots/**").permitAll()
-
-                // GET público — el contacto ve el mapa sin login
                 it.requestMatchers(HttpMethod.GET, "/api/location-shares/*").permitAll()
-
-                // POST público — envío del correo con el link
                 it.requestMatchers(HttpMethod.POST, "/api/location-shares/*/share-email").permitAll()
 
-                // Cualquier otra ruta requiere estar autenticado
+                // Solo el admin (ROLE_ADMIN inyectado en JwtFilter) puede entrar aquí
+                it.requestMatchers("/api/admin/**").hasRole("ADMIN")
+
                 it.anyRequest().authenticated()
             }
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter::class.java)

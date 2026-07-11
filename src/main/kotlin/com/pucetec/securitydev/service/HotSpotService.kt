@@ -31,6 +31,11 @@ class HotSpotService(
         return hotSpotRepository.findByActiveTrue().map { hotSpotMapper.toResponse(it) }
     }
 
+    // Admin ve TODO, incluidas las inactivas/expiradas
+    fun getAllHotSpotsAdmin(): List<HotSpotResponse> {
+        return hotSpotRepository.findAll().map { hotSpotMapper.toResponse(it) }
+    }
+
     fun getHotSpotById(id: Long): HotSpotResponse {
         val hotSpot = hotSpotRepository.findById(id).orElseThrow {
             HotSpotNotFoundException("Punto de peligro no encontrado con ID: $id")
