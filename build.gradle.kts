@@ -34,6 +34,7 @@ dependencies {
 	testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
 	testImplementation("org.mockito:mockito-junit-jupiter:5.11.0")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
+	testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
 }
 
 tasks.withType<Test> {
