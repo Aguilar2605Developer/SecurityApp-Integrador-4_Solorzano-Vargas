@@ -24,7 +24,8 @@ class LocationShareMapper {
             longitude = locationShare.longitude,
             username = locationShare.users?.name,
             active = locationShare.active,
-            expiresAt = locationShare.expiresAt
+            expiresAt = locationShare.expiresAt,
+            userId = locationShare.users?.id
         )
     }
 }

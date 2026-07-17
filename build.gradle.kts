@@ -23,10 +23,9 @@ dependencies {
 	// Spring Security
 	implementation("org.springframework.boot:spring-boot-starter-security")
 
-	// JWT
-	implementation("io.jsonwebtoken:jjwt-api:0.11.5")
-	implementation("io.jsonwebtoken:jjwt-impl:0.11.5")
-	implementation("io.jsonwebtoken:jjwt-jackson:0.11.5")
+	// Cognito: validación de JWT (Resource Server) + API de administración (crear/resetear/borrar usuarios)
+	implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+	implementation("software.amazon.awssdk:cognitoidentityprovider:2.25.60")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
@@ -35,6 +34,7 @@ dependencies {
 	testImplementation("org.mockito:mockito-junit-jupiter:5.11.0")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
+	implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
 }
 
 tasks.withType<Test> {

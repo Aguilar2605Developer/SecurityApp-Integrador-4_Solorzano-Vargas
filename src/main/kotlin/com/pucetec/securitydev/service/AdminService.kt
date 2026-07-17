@@ -8,7 +8,6 @@ import com.pucetec.securitydev.entity.Users
 import com.pucetec.securitydev.repository.HotSpotRepository
 import com.pucetec.securitydev.repository.LocationShareRepository
 import com.pucetec.securitydev.repository.UserRepository
-import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 
 @Service
@@ -16,12 +15,10 @@ class AdminService(
     private val userRepository: UserRepository,
     private val hotSpotRepository: HotSpotRepository,
     private val locationShareRepository: LocationShareRepository,
-    private val passwordEncoder: PasswordEncoder
+    private val cognitoAdminService: CognitoAdminService
 ) {
 
-    fun getAllUsers(): List<UserAdminResponse> {
-        return userRepository.findAll().map { toUserAdminResponse(it) }
-    }
+    fun getAllUsers(): List<UserAdminResponse> = userRepository.findAll().map { toUserAdminResponse(it) }
 
     fun getUserById(id: Long): UserAdminResponse {
         val user = userRepository.findById(id).orElseThrow {
@@ -30,21 +27,22 @@ class AdminService(
         return toUserAdminResponse(user)
     }
 
-    // ── Crear usuario (nuevo) ──────────────────────────────────────
-    // A diferencia de UserService.registerUser (usado por el registro público),
-    // este método lo invoca un admin desde el panel: aquí SÍ se define una
-    // contraseña inicial explícita en vez de que el usuario la elija.
+    // Crea el usuario primero en Cognito (fuente real de verdad de la identidad),
+    // y solo si eso funciona, guarda el perfil local enlazado por 'sub'.
     fun createUser(request: UserCreateRequest): UserAdminResponse {
         if (userRepository.existsByEmail(request.email)) {
             throw IllegalArgumentException("Ya existe un usuario registrado con ese correo")
         }
 
+        val sub = cognitoAdminService.createUser(request.email, request.name, request.password)
+        cognitoAdminService.addUserToGroup(request.email, "USER")
+
         val newUser = Users(
-            id = 0, // 0 le indica a Hibernate/JPA que genere el ID automáticamente al insertar
+            id = 0,
+            cognitoSub = sub,
             name = request.name,
             email = request.email,
             number = request.number,
-            password = passwordEncoder.encode(request.password),
             hotSpots = mutableListOf()
         )
         return toUserAdminResponse(userRepository.save(newUser))
@@ -54,41 +52,31 @@ class AdminService(
         val existing = userRepository.findById(id).orElseThrow {
             RuntimeException("Usuario no encontrado con ID: $id")
         }
-        // hotSpots = existing.hotSpots preserva la relación —
-        // si no se pasa, Hibernate interpreta que se los quitaron todos y los BORRA (orphanRemoval).
         val updated = Users(
             id = existing.id,
+            cognitoSub = existing.cognitoSub,
             name = request.name,
             email = request.email,
             number = request.number,
-            password = existing.password,
             hotSpots = existing.hotSpots
         )
         return toUserAdminResponse(userRepository.save(updated))
     }
 
+    // El reset de contraseña ahora pasa por Cognito, no se toca la base local
     fun resetPassword(id: Long, newPassword: String) {
         val existing = userRepository.findById(id).orElseThrow {
             RuntimeException("Usuario no encontrado con ID: $id")
         }
-        val updated = Users(
-            id = existing.id,
-            name = existing.name,
-            email = existing.email,
-            number = existing.number,
-            password = passwordEncoder.encode(newPassword),
-            hotSpots = existing.hotSpots
-        )
-        userRepository.save(updated)
+        cognitoAdminService.resetPassword(existing.email, newPassword)
     }
 
     fun deleteUser(id: Long) {
-        if (!userRepository.existsById(id)) {
-            throw RuntimeException("Usuario no encontrado con ID: $id")
+        val existing = userRepository.findById(id).orElseThrow {
+            RuntimeException("Usuario no encontrado con ID: $id")
         }
-        // Sin esto, el DELETE falla por la foreign key de location_share → users
         locationShareRepository.deleteByUsersId(id)
-        // Los hotspots del usuario se borran solos (cascade + orphanRemoval en Users.hotSpots)
+        cognitoAdminService.deleteUser(existing.email)
         userRepository.deleteById(id)
     }
 

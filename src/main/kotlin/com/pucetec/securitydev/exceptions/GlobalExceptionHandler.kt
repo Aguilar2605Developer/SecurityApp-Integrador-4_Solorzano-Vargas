@@ -54,6 +54,11 @@ class GlobalExceptionHandler {
         return ResponseEntity(ex.message, HttpStatus.BAD_REQUEST)
     }
 
+    // 403 - Cuando un usuario intenta modificar algo que no le pertenece
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException::class)
+    fun handleAccessDenied(ex: org.springframework.security.access.AccessDeniedException): ResponseEntity<String> {
+        return ResponseEntity(ex.message, HttpStatus.FORBIDDEN)
+    }
     // 404 - RuntimeException genérico
     @ExceptionHandler(RuntimeException::class)
     fun handleRuntimeException(ex: RuntimeException): ResponseEntity<String> {

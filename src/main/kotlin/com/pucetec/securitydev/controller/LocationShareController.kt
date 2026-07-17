@@ -2,16 +2,20 @@ package com.pucetec.securitydev.controller
 
 import com.pucetec.securitydev.dto.LocationShareRequest
 import com.pucetec.securitydev.dto.LocationShareResponse
+import com.pucetec.securitydev.security.CurrentUser
 import com.pucetec.securitydev.service.EmailService
 import com.pucetec.securitydev.service.LocationShareService
+import com.pucetec.securitydev.service.UserService
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/location-shares")
 class LocationShareController(
     private val locationShareService: LocationShareService,
-    private val emailService: EmailService
+    private val emailService: EmailService,
+    private val userService: UserService
 ) {
 
     data class ShareEmailRequest(val email: String)
@@ -23,19 +27,29 @@ class LocationShareController(
         return ResponseEntity.ok(response)
     }
 
-    // PUT /api/location-shares/{shareId} — actualiza la posición (requiere JWT)
+    // PUT /api/location-shares/{shareId} — actualiza la posición (solo el dueño)
     @PutMapping("/{shareId}")
     fun updateLocation(
         @PathVariable shareId: String,
         @RequestBody request: LocationShareRequest
     ): ResponseEntity<LocationShareResponse> {
+        val existing = locationShareService.getByShareId(shareId)
+        val currentLocalId = userService.resolveLocalId(CurrentUser.sub())
+        if (existing.userId != null && existing.userId != currentLocalId) {
+            throw AccessDeniedException("No puedes actualizar la ubicación de otro usuario")
+        }
         val response = locationShareService.updateLocation(shareId, request.latitude, request.longitude)
         return ResponseEntity.ok(response)
     }
 
-    // PUT /api/location-shares/{shareId}/stop — detiene el compartir (requiere JWT)
+    // PUT /api/location-shares/{shareId}/stop — detiene el compartir (solo el dueño)
     @PutMapping("/{shareId}/stop")
     fun stopSharing(@PathVariable shareId: String): ResponseEntity<LocationShareResponse> {
+        val existing = locationShareService.getByShareId(shareId)
+        val currentLocalId = userService.resolveLocalId(CurrentUser.sub())
+        if (existing.userId != null && existing.userId != currentLocalId) {
+            throw AccessDeniedException("No puedes detener la ubicación de otro usuario")
+        }
         val response = locationShareService.stopSharing(shareId)
         return ResponseEntity.ok(response)
     }

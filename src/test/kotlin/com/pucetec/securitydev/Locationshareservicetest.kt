@@ -58,7 +58,7 @@ class LocationShareServiceTest {
 
     @BeforeEach
     fun setUp() {
-        sampleUser = Users(id = 1L, name = "Juan Perez", email = "juanperez@example.com", number = "0999999999", password = "hashed-password")
+        sampleUser = Users(id = 1L, cognitoSub = "cognito-sub-juan", name = "Juan Perez", email = "juanperez@example.com", number = "0999999999")
 
         sampleRequest = LocationShareRequest(
             userId = 1L,

@@ -15,27 +15,12 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.doThrow
-import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.springframework.security.crypto.password.PasswordEncoder
 import java.util.Optional
 
-/**
- * Tests unitarios para AdminService.
- *
- * Requiere en build.gradle.kts (o pom.xml):
- *   testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
- *   testImplementation("org.mockito:mockito-junit-jupiter:5.11.0")
- *   testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
- *
- * NOTA: Ajusta los nombres/campos de las entidades y DTOs (Users, HotSpot,
- * UserCreateRequest, UserUpdateRequest, UserAdminResponse, DashboardResponse)
- * si difieren de los que se infirieron a partir de AdminService.
- */
 @ExtendWith(MockitoExtension::class)
 class AdminServiceTest {
 
@@ -49,7 +34,7 @@ class AdminServiceTest {
     lateinit var locationShareRepository: LocationShareRepository
 
     @Mock
-    lateinit var passwordEncoder: PasswordEncoder
+    lateinit var cognitoAdminService: CognitoAdminService
 
     private lateinit var adminService: AdminService
 
@@ -61,15 +46,15 @@ class AdminServiceTest {
             userRepository,
             hotSpotRepository,
             locationShareRepository,
-            passwordEncoder
+            cognitoAdminService
         )
 
         sampleUser = Users(
             id = 1L,
+            cognitoSub = "cognito-sub-abc",
             name = "Juan Perez",
             email = "juan@example.com",
             number = "0999999999",
-            password = "encodedPass",
             hotSpots = mutableListOf()
         )
     }
@@ -122,7 +107,7 @@ class AdminServiceTest {
     // ── createUser ──────────────────────────────────────────────────
 
     @Test
-    fun `createUser deberia crear el usuario cuando el correo no existe`() {
+    fun `createUser deberia crear el usuario en Cognito y guardar el perfil local cuando el correo no existe`() {
         val request = UserCreateRequest(
             name = "Nuevo Usuario",
             email = "nuevo@example.com",
@@ -131,15 +116,19 @@ class AdminServiceTest {
         )
 
         whenever(userRepository.existsByEmail(request.email)).doReturn(false)
-        whenever(passwordEncoder.encode(request.password)).doReturn("encodedPlainPass")
+        whenever(cognitoAdminService.createUser(request.email, request.name, request.password))
+            .doReturn("cognito-sub-nuevo")
         whenever(userRepository.save(any())).thenAnswer { it.arguments[0] as Users }
 
         val result = adminService.createUser(request)
 
         assertEquals(request.name, result.name)
         assertEquals(request.email, result.email)
-        verify(passwordEncoder, times(1)).encode(request.password)
-        verify(userRepository, times(1)).save(any())
+        verify(cognitoAdminService, times(1)).createUser(request.email, request.name, request.password)
+        verify(cognitoAdminService, times(1)).addUserToGroup(request.email, "USER")
+        verify(userRepository, times(1)).save(
+            org.mockito.kotlin.argThat { user -> user.cognitoSub == "cognito-sub-nuevo" }
+        )
     }
 
     @Test
@@ -156,13 +145,14 @@ class AdminServiceTest {
         assertThrows(IllegalArgumentException::class.java) {
             adminService.createUser(request)
         }
+        verify(cognitoAdminService, never()).createUser(any(), any(), any())
         verify(userRepository, never()).save(any())
     }
 
     // ── updateUser ──────────────────────────────────────────────────
 
     @Test
-    fun `updateUser deberia actualizar datos preservando password y hotspots`() {
+    fun `updateUser deberia actualizar datos preservando cognitoSub y hotspots`() {
         val request = UserUpdateRequest(
             name = "Juan Actualizado",
             email = "juan.actualizado@example.com",
@@ -178,7 +168,7 @@ class AdminServiceTest {
         assertEquals(request.email, result.email)
         verify(userRepository).save(
             org.mockito.kotlin.argThat { user ->
-                user.password == sampleUser.password && user.hotSpots == sampleUser.hotSpots
+                user.cognitoSub == sampleUser.cognitoSub && user.hotSpots == sampleUser.hotSpots
             }
         )
     }
@@ -200,17 +190,13 @@ class AdminServiceTest {
     // ── resetPassword ───────────────────────────────────────────────
 
     @Test
-    fun `resetPassword deberia codificar y guardar la nueva contrasena`() {
+    fun `resetPassword deberia delegar en Cognito usando el email del usuario`() {
         whenever(userRepository.findById(1L)).doReturn(Optional.of(sampleUser))
-        whenever(passwordEncoder.encode("nuevaClave123")).doReturn("nuevaClaveEncoded")
-        whenever(userRepository.save(any())).thenAnswer { it.arguments[0] as Users }
 
         adminService.resetPassword(1L, "nuevaClave123")
 
-        verify(passwordEncoder).encode("nuevaClave123")
-        verify(userRepository).save(
-            org.mockito.kotlin.argThat { user -> user.password == "nuevaClaveEncoded" }
-        )
+        verify(cognitoAdminService, times(1)).resetPassword(sampleUser.email, "nuevaClave123")
+        verify(userRepository, never()).save(any())
     }
 
     @Test
@@ -220,29 +206,31 @@ class AdminServiceTest {
         assertThrows(RuntimeException::class.java) {
             adminService.resetPassword(99L, "clave")
         }
-        verify(passwordEncoder, never()).encode(any())
+        verify(cognitoAdminService, never()).resetPassword(any(), any())
     }
 
     // ── deleteUser ──────────────────────────────────────────────────
 
     @Test
-    fun `deleteUser deberia borrar location shares y luego el usuario`() {
-        whenever(userRepository.existsById(1L)).doReturn(true)
+    fun `deleteUser deberia borrar location shares, borrar en Cognito y luego el usuario`() {
+        whenever(userRepository.findById(1L)).doReturn(Optional.of(sampleUser))
 
         adminService.deleteUser(1L)
 
         verify(locationShareRepository, times(1)).deleteByUsersId(1L)
+        verify(cognitoAdminService, times(1)).deleteUser(sampleUser.email)
         verify(userRepository, times(1)).deleteById(1L)
     }
 
     @Test
     fun `deleteUser deberia lanzar excepcion si el usuario no existe`() {
-        whenever(userRepository.existsById(99L)).doReturn(false)
+        whenever(userRepository.findById(99L)).doReturn(Optional.empty())
 
         assertThrows(RuntimeException::class.java) {
             adminService.deleteUser(99L)
         }
         verify(locationShareRepository, never()).deleteByUsersId(any())
+        verify(cognitoAdminService, never()).deleteUser(any())
         verify(userRepository, never()).deleteById(any())
     }
 

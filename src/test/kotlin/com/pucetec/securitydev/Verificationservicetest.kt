@@ -24,21 +24,6 @@ import org.mockito.kotlin.whenever
 import java.time.LocalDateTime
 import java.util.Optional
 
-/**
- * Clases confirmadas contra el código real del proyecto:
- *  - dto.VerificationRequest (data class): userId, status, hotSpotId
- *  - dto.VerificationResponse (data class): id, username, status, createdAt, userId, hotSpotId
- *  - entity.Verification (open class): id: Long = 0L, createdAt: LocalDateTime = now(), status: String = "",
- *                          user: Users (obligatorio), hotSpot: HotSpot (obligatorio)
- *  - entity.Users: id, name, email, number, password, hotSpots: MutableList<HotSpot>
- *  - entity.HotSpot (data class): id, latitude, longitude, modality, description, peopleInvolved,
- *                          active, expiresAt, users: Users?
- *  - mappers.VerificationMapper: toEntity(request, user, hotSpot, id: Long = 0L): Verification
- *                                toResponse(verification): VerificationResponse
- *  - repository.VerificationRepository: JpaRepository<Verification, Long> estándar
- *  - repository.HotSpotRepository: JpaRepository<HotSpot, Long> estándar (findById heredado)
- *  - repository.UserRepository: JpaRepository<Users, Long> estándar (findById heredado)
- */
 @ExtendWith(MockitoExtension::class)
 class VerificationServiceTest {
 
@@ -67,10 +52,10 @@ class VerificationServiceTest {
     fun setUp() {
         sampleUser = Users(
             id = 1L,
+            cognitoSub = "cognito-sub-juan",
             name = "Juan Perez",
             email = "juanperez@example.com",
-            number = "0999999999",
-            password = "encoded-password"
+            number = "0999999999"
         )
 
         sampleHotSpot = HotSpot(
@@ -159,10 +144,10 @@ class VerificationServiceTest {
     fun `getAllVerifications deberia devolver la lista de verificaciones mapeadas`() {
         val secondUser = Users(
             id = 2L,
+            cognitoSub = "cognito-sub-maria",
             name = "Maria Lopez",
             email = "marialopez@example.com",
-            number = "0988888888",
-            password = "encoded-password-2"
+            number = "0988888888"
         )
         val secondEntity = Verification(
             id = 2L,

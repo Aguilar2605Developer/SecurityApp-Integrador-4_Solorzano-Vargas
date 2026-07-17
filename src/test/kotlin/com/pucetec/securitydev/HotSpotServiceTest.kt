@@ -36,7 +36,7 @@ class HotSpotServiceTest {
     fun setUp() {
         hotSpotService = HotSpotService(hotSpotRepository, userRepository, hotSpotMapper)
 
-        sampleUser = Users(id = 1L, name = "Juan", email = "j@e.com", number = "123", password = "p")
+        sampleUser = Users(id = 1L, cognitoSub = "cognito-sub-juan", name = "Juan", email = "j@e.com", number = "123")
 
         sampleHotSpot = HotSpot(
             id = 10L, latitude = -0.1, longitude = -78.4, modality = "ROBO",

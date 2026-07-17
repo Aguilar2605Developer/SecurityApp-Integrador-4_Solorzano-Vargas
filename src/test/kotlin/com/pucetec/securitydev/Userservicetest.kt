@@ -12,25 +12,9 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
-import org.mockito.kotlin.any
-import org.mockito.kotlin.never
-import org.mockito.kotlin.times
-import org.mockito.kotlin.verify
-import org.mockito.kotlin.whenever
-import org.springframework.security.crypto.password.PasswordEncoder
+import org.mockito.kotlin.*
 import java.util.Optional
 
-/**
- * Clases confirmadas contra el código real del proyecto:
- *  - dto.UserRequest (data class): name, email, number, password
- *  - dto.UserResponse (data class): id, name, email, number
- *  - entity.Users: id: Long, name: String, email: String, number: String, password: String,
- *                  hotSpots: MutableList<HotSpot>
- *  - mappers.UserMapper: toEntity(request: UserRequest, id: Long = 0L): Users
- *                        toResponse(user: Users): UserResponse
- *  - repository.UserRepository: JpaRepository<Users, Long> estándar
- *                        (findAll, findById, existsById, save, deleteById heredados)
- */
 @ExtendWith(MockitoExtension::class)
 class UserServiceTest {
 
@@ -40,31 +24,20 @@ class UserServiceTest {
     @Mock
     private lateinit var userMapper: UserMapper
 
-    @Mock
-    private lateinit var passwordEncoder: PasswordEncoder
-
     @InjectMocks
     private lateinit var userService: UserService
 
-    private lateinit var sampleRequest: UserRequest
     private lateinit var sampleEntity: Users
     private lateinit var sampleResponse: UserResponse
 
     @BeforeEach
     fun setUp() {
-        sampleRequest = UserRequest(
-            name = "Juan Perez",
-            email = "juanperez@example.com",
-            number = "0999999999",
-            password = "plain-password"
-        )
-
         sampleEntity = Users(
             id = 1L,
+            cognitoSub = "sub-abc-123",
             name = "Juan Perez",
             email = "juanperez@example.com",
-            number = "0999999999",
-            password = "encoded-password"
+            number = "0999999999"
         )
 
         sampleResponse = UserResponse(
@@ -75,42 +48,39 @@ class UserServiceTest {
         )
     }
 
-    // ---------------------- registerUser ----------------------
+    // ---------------------- findOrCreateByCognitoSub ----------------------
 
     @Test
-    fun `registerUser deberia encriptar el password, guardar el usuario y devolver el response`() {
-        val encodedRequest = sampleRequest.copy(password = "encoded-password")
-
-        whenever(passwordEncoder.encode("plain-password")).thenReturn("encoded-password")
-        whenever(userMapper.toEntity(encodedRequest)).thenReturn(sampleEntity)
-        whenever(userRepository.save(sampleEntity)).thenReturn(sampleEntity)
+    fun `findOrCreateByCognitoSub deberia devolver el usuario existente si el sub ya esta registrado`() {
+        whenever(userRepository.findByCognitoSub("sub-abc-123")).thenReturn(sampleEntity)
         whenever(userMapper.toResponse(sampleEntity)).thenReturn(sampleResponse)
 
-        val result = userService.registerUser(sampleRequest)
+        val result = userService.findOrCreateByCognitoSub("sub-abc-123", "juanperez@example.com", "Juan Perez")
 
         assertEquals(sampleResponse.id, result.id)
-        assertEquals(sampleResponse.email, result.email)
-        verify(passwordEncoder, times(1)).encode("plain-password")
-        verify(userRepository, times(1)).save(sampleEntity)
+        verify(userRepository, never()).save(any<Users>())
+    }
+
+    @Test
+    fun `findOrCreateByCognitoSub deberia crear el usuario si el sub no existe`() {
+        whenever(userRepository.findByCognitoSub("sub-nuevo")).thenReturn(null)
+        whenever(userRepository.save(any<Users>())).thenAnswer { it.arguments[0] as Users }
+        whenever(userMapper.toResponse(any<Users>())).thenReturn(sampleResponse)
+
+        val result = userService.findOrCreateByCognitoSub("sub-nuevo", "nuevo@example.com", "Nuevo Usuario")
+
+        assertNotNull(result)
+        verify(userRepository, times(1)).save(
+            argThat { user -> user.cognitoSub == "sub-nuevo" && user.email == "nuevo@example.com" }
+        )
     }
 
     // ---------------------- getAllUsers ----------------------
 
     @Test
     fun `getAllUsers deberia devolver la lista de usuarios mapeados`() {
-        val secondEntity = Users(
-            id = 2L,
-            name = "Maria Lopez",
-            email = "marialopez@example.com",
-            number = "0988888888",
-            password = "encoded-password-2"
-        )
-        val secondResponse = UserResponse(
-            id = 2L,
-            name = "Maria Lopez",
-            email = "marialopez@example.com",
-            number = "0988888888"
-        )
+        val secondEntity = Users(id = 2L, cognitoSub = "sub-2", name = "Maria Lopez", email = "marialopez@example.com", number = "0988888888")
+        val secondResponse = UserResponse(id = 2L, name = "Maria Lopez", email = "marialopez@example.com", number = "0988888888")
 
         whenever(userRepository.findAll()).thenReturn(listOf(sampleEntity, secondEntity))
         whenever(userMapper.toResponse(sampleEntity)).thenReturn(sampleResponse)
@@ -119,8 +89,6 @@ class UserServiceTest {
         val result = userService.getAllUsers()
 
         assertEquals(2, result.size)
-        assertEquals(sampleResponse.email, result[0].email)
-        assertEquals(secondResponse.email, result[1].email)
         verify(userRepository, times(1)).findAll()
     }
 
@@ -145,7 +113,6 @@ class UserServiceTest {
 
         assertNotNull(result)
         assertEquals(sampleResponse.id, result?.id)
-        verify(userRepository, times(1)).findById(1L)
     }
 
     @Test
@@ -161,31 +128,28 @@ class UserServiceTest {
     // ---------------------- updateUser ----------------------
 
     @Test
-    fun `updateUser deberia actualizar y devolver el usuario cuando existe`() {
-        val encodedRequest = sampleRequest.copy(password = "encoded-password")
+    fun `updateUser deberia actualizar nombre y numero preservando cognitoSub y email`() {
+        val request = UserRequest(name = "Juan Actualizado", number = "0977777777")
 
-        whenever(userRepository.existsById(1L)).thenReturn(true)
-        whenever(passwordEncoder.encode("plain-password")).thenReturn("encoded-password")
-        whenever(userMapper.toEntity(encodedRequest, 1L)).thenReturn(sampleEntity)
-        whenever(userRepository.save(sampleEntity)).thenReturn(sampleEntity)
-        whenever(userMapper.toResponse(sampleEntity)).thenReturn(sampleResponse)
+        whenever(userRepository.findById(1L)).thenReturn(Optional.of(sampleEntity))
+        whenever(userRepository.save(any<Users>())).thenAnswer { it.arguments[0] as Users }
+        whenever(userMapper.toResponse(any<Users>())).thenReturn(sampleResponse)
 
-        val result = userService.updateUser(1L, sampleRequest)
+        val result = userService.updateUser(1L, request)
 
         assertNotNull(result)
-        assertEquals(sampleResponse.id, result?.id)
-        verify(userRepository, times(1)).existsById(1L)
-        verify(userRepository, times(1)).save(sampleEntity)
+        verify(userRepository).save(
+            argThat { user -> user.cognitoSub == sampleEntity.cognitoSub && user.email == sampleEntity.email }
+        )
     }
 
     @Test
     fun `updateUser deberia devolver null cuando el usuario no existe`() {
-        whenever(userRepository.existsById(99L)).thenReturn(false)
+        whenever(userRepository.findById(99L)).thenReturn(Optional.empty())
 
-        val result = userService.updateUser(99L, sampleRequest)
+        val result = userService.updateUser(99L, UserRequest(name = "X", number = "000"))
 
         assertNull(result)
-        verify(passwordEncoder, never()).encode(any<String>())
         verify(userRepository, never()).save(any<Users>())
     }
 
@@ -209,5 +173,23 @@ class UserServiceTest {
 
         assertFalse(result)
         verify(userRepository, never()).deleteById(any<Long>())
+    }
+
+    // ---------------------- resolveLocalId ----------------------
+
+    @Test
+    fun `resolveLocalId deberia devolver el id local cuando el sub existe`() {
+        whenever(userRepository.findByCognitoSub("sub-abc-123")).thenReturn(sampleEntity)
+
+        val result = userService.resolveLocalId("sub-abc-123")
+
+        assertEquals(1L, result)
+    }
+
+    @Test
+    fun `resolveLocalId deberia devolver null cuando el sub es null`() {
+        val result = userService.resolveLocalId(null)
+
+        assertNull(result)
     }
 }

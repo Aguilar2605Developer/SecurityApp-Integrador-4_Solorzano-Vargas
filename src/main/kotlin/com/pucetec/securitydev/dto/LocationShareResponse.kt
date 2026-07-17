@@ -8,5 +8,6 @@ class LocationShareResponse(
     val longitude: Double,
     val username: String?,
     val active: Boolean,
-    val expiresAt: LocalDateTime
+    val expiresAt: LocalDateTime,
+    val userId: Long? = null
 )
