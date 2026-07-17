@@ -34,7 +34,6 @@ dependencies {
 	testImplementation("org.mockito:mockito-junit-jupiter:5.11.0")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
 	testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
-	implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
 }
 
 tasks.withType<Test> {

@@ -9,8 +9,8 @@ class Users(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0L,
 
-    @Column(unique = true, nullable = false)
-    val cognitoSub: String = "",
+    @Column(unique = true, nullable = true)
+    val cognitoSub: String? = null,
 
     val name: String = "",
     val email: String = "",

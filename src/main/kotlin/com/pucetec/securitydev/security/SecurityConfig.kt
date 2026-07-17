@@ -47,9 +47,11 @@ class SecurityConfig {
             .csrf { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests {
+                it.requestMatchers(HttpMethod.GET, "/api/health", "/api/health/**").permitAll()
                 it.requestMatchers(HttpMethod.GET, "/api/hotspots", "/api/hotspots/**").permitAll()
                 it.requestMatchers(HttpMethod.GET, "/api/location-shares/*").permitAll()
                 it.requestMatchers(HttpMethod.POST, "/api/location-shares/*/share-email").permitAll()
+                it.requestMatchers(HttpMethod.POST, "/api/users/register").permitAll()
                 it.requestMatchers("/api/admin/**").hasRole("ADMIN")
                 it.anyRequest().authenticated()
             }

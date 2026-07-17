@@ -24,6 +24,9 @@ class UserServiceTest {
     @Mock
     private lateinit var userMapper: UserMapper
 
+    @Mock
+    private lateinit var cognitoService: CognitoService
+
     @InjectMocks
     private lateinit var userService: UserService
 
