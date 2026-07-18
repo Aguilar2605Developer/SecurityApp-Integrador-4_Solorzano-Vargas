@@ -21,11 +21,6 @@ class GlobalExceptionHandler {
         return ResponseEntity(ex.message, HttpStatus.NOT_FOUND)
     }
 
-    @ExceptionHandler(VerificationNotFoundException::class)
-    fun handleVerificationNotFound(ex: VerificationNotFoundException): ResponseEntity<String> {
-        return ResponseEntity(ex.message, HttpStatus.NOT_FOUND)
-    }
-
     @ExceptionHandler(LocationShareNotFoundException::class)
     fun handleLocationShareNotFound(ex: LocationShareNotFoundException): ResponseEntity<String> {
         return ResponseEntity(ex.message, HttpStatus.NOT_FOUND)

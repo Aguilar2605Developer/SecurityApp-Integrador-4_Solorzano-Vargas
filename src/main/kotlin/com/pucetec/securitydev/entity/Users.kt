@@ -17,5 +17,5 @@ class Users(
     val number: String = "",
 
     @OneToMany(mappedBy = "users", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val hotSpots: MutableList<HotSpot> = mutableListOf()
+    val hotSpotReports: MutableList<HotSpotReport> = mutableListOf()
 )

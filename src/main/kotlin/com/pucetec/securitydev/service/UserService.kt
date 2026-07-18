@@ -30,7 +30,7 @@ class UserService(
                 email = byEmail.email,
                 name = byEmail.name.ifBlank { name },
                 number = byEmail.number,
-                hotSpots = byEmail.hotSpots
+                hotSpotReports = byEmail.hotSpotReports
             )
             return userMapper.toResponse(userRepository.save(updated))
         }
@@ -52,7 +52,7 @@ class UserService(
             email = existing.email,
             name = request.name,
             number = request.number,
-            hotSpots = existing.hotSpots
+            hotSpotReports = existing.hotSpotReports
         )
         return userMapper.toResponse(userRepository.save(updated))
     }

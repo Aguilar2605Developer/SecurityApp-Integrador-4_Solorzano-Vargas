@@ -3,8 +3,10 @@ package com.pucetec.securitydev.service
 import com.pucetec.securitydev.dto.UserCreateRequest
 import com.pucetec.securitydev.dto.UserUpdateRequest
 import com.pucetec.securitydev.entity.HotSpot
+import com.pucetec.securitydev.entity.HotSpotReport
 import com.pucetec.securitydev.entity.Users
 import com.pucetec.securitydev.repository.HotSpotRepository
+import com.pucetec.securitydev.repository.HotSpotReportRepository
 import com.pucetec.securitydev.repository.LocationShareRepository
 import com.pucetec.securitydev.repository.UserRepository
 import org.junit.jupiter.api.Assertions.*
@@ -31,6 +33,9 @@ class AdminServiceTest {
     lateinit var hotSpotRepository: HotSpotRepository
 
     @Mock
+    lateinit var hotSpotReportRepository: HotSpotReportRepository
+
+    @Mock
     lateinit var locationShareRepository: LocationShareRepository
 
     @Mock
@@ -45,6 +50,7 @@ class AdminServiceTest {
         adminService = AdminService(
             userRepository,
             hotSpotRepository,
+            hotSpotReportRepository,
             locationShareRepository,
             cognitoAdminService
         )
@@ -55,7 +61,7 @@ class AdminServiceTest {
             name = "Juan Perez",
             email = "juan@example.com",
             number = "0999999999",
-            hotSpots = mutableListOf()
+            hotSpotReports = mutableListOf()
         )
     }
 
@@ -152,7 +158,7 @@ class AdminServiceTest {
     // ── updateUser ──────────────────────────────────────────────────
 
     @Test
-    fun `updateUser deberia actualizar datos preservando cognitoSub y hotspots`() {
+    fun `updateUser deberia actualizar datos preservando cognitoSub y hotSpotReports`() {
         val request = UserUpdateRequest(
             name = "Juan Actualizado",
             email = "juan.actualizado@example.com",
@@ -168,7 +174,7 @@ class AdminServiceTest {
         assertEquals(request.email, result.email)
         verify(userRepository).save(
             org.mockito.kotlin.argThat { user ->
-                user.cognitoSub == sampleUser.cognitoSub && user.hotSpots == sampleUser.hotSpots
+                user.cognitoSub == sampleUser.cognitoSub && user.hotSpotReports == sampleUser.hotSpotReports
             }
         )
     }
@@ -238,12 +244,18 @@ class AdminServiceTest {
 
     @Test
     fun `getDashboardStats deberia calcular correctamente las estadisticas`() {
-        val hotspot1 = HotSpot(id = 1L, modality = "WIFI", active = true)
-        val hotspot2 = HotSpot(id = 2L, modality = "WIFI", active = true)
-        val hotspot3 = HotSpot(id = 3L, modality = "BLUETOOTH", active = true)
+        val hotspot1 = HotSpot(id = 1L, active = true)
+        val hotspot2 = HotSpot(id = 2L, active = true)
+        val hotspot3 = HotSpot(id = 3L, active = true)
+
+        val report1 = HotSpotReport(id = 100L, modality = "WIFI", hotSpot = hotspot1)
+        val report2 = HotSpotReport(id = 101L, modality = "WIFI", hotSpot = hotspot2)
+        val report3 = HotSpotReport(id = 102L, modality = "BLUETOOTH", hotSpot = hotspot3)
 
         whenever(userRepository.count()).doReturn(10L)
         whenever(hotSpotRepository.findByActiveTrue()).doReturn(listOf(hotspot1, hotspot2, hotspot3))
+        whenever(hotSpotReportRepository.findByHotSpotIdIn(listOf(1L, 2L, 3L)))
+            .doReturn(listOf(report1, report2, report3))
         whenever(locationShareRepository.countByActiveTrue()).doReturn(5L)
 
         val result = adminService.getDashboardStats()

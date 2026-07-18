@@ -3,6 +3,7 @@ package com.pucetec.securitydev.mappers
 import com.pucetec.securitydev.dto.HotSpotRequest
 import com.pucetec.securitydev.dto.HotSpotResponse
 import com.pucetec.securitydev.entity.HotSpot
+import com.pucetec.securitydev.entity.HotSpotReport
 import com.pucetec.securitydev.entity.Users
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
@@ -10,32 +11,42 @@ import java.time.LocalDateTime
 @Component
 class HotSpotMapper {
 
-    fun toEntity(request: HotSpotRequest, users: Users?, id: Long = 0L): HotSpot {
+    // Construye solo la parte "geográfica" del punto de peligro
+    fun toHotSpotEntity(request: HotSpotRequest, id: Long = 0L): HotSpot {
         return HotSpot(
             id = id,
             latitude = request.latitude,
             longitude = request.longitude,
+            active = true,
+            expiresAt = LocalDateTime.now().plusHours(request.durationHours)
+        )
+    }
+
+    // Construye el reporte asociado (modalidad, descripción, personas involucradas, quién reporta)
+    fun toReportEntity(request: HotSpotRequest, hotSpot: HotSpot, users: Users?, id: Long = 0L): HotSpotReport {
+        return HotSpotReport(
+            id = id,
             modality = request.modality,
             description = request.description,
             peopleInvolved = request.peopleInvolved,
-            active = true,
-            expiresAt = LocalDateTime.now().plusHours(request.durationHours),
+            hotSpot = hotSpot,
             users = users
         )
     }
 
-    fun toResponse(hotSpot: HotSpot): HotSpotResponse {
+    // Combina HotSpot + su reporte en la misma respuesta plana que ya consume el frontend
+    fun toResponse(hotSpot: HotSpot, report: HotSpotReport?): HotSpotResponse {
         return HotSpotResponse(
             id = hotSpot.id,
             latitude = hotSpot.latitude,
             longitude = hotSpot.longitude,
-            modality = hotSpot.modality,
-            description = hotSpot.description,
-            userId = hotSpot.users?.id,
-            username = hotSpot.users?.name,
+            modality = report?.modality ?: "",
+            description = report?.description ?: "",
+            userId = report?.users?.id,
+            username = report?.users?.name,
             active = hotSpot.active,
             expiresAt = hotSpot.expiresAt,
-            peopleInvolved = hotSpot.peopleInvolved
+            peopleInvolved = report?.peopleInvolved ?: 0
         )
     }
 }

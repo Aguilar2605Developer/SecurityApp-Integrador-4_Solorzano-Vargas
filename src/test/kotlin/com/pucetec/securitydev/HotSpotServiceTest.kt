@@ -3,9 +3,11 @@ package com.pucetec.securitydev
 import com.pucetec.securitydev.dto.HotSpotRequest
 import com.pucetec.securitydev.dto.HotSpotResponse
 import com.pucetec.securitydev.entity.HotSpot
+import com.pucetec.securitydev.entity.HotSpotReport
 import com.pucetec.securitydev.entity.Users
 import com.pucetec.securitydev.exceptions.HotSpotNotFoundException
 import com.pucetec.securitydev.mappers.HotSpotMapper
+import com.pucetec.securitydev.repository.HotSpotReportRepository
 import com.pucetec.securitydev.repository.HotSpotRepository
 import com.pucetec.securitydev.repository.UserRepository
 import com.pucetec.securitydev.service.HotSpotService
@@ -23,25 +25,31 @@ import java.util.Optional
 class HotSpotServiceTest {
 
     @Mock lateinit var hotSpotRepository: HotSpotRepository
+    @Mock lateinit var hotSpotReportRepository: HotSpotReportRepository
     @Mock lateinit var userRepository: UserRepository
     @Mock lateinit var hotSpotMapper: HotSpotMapper
 
     private lateinit var hotSpotService: HotSpotService
     private lateinit var sampleUser: Users
     private lateinit var sampleHotSpot: HotSpot
+    private lateinit var sampleReport: HotSpotReport
     private lateinit var sampleRequest: HotSpotRequest
     private lateinit var sampleResponse: HotSpotResponse
 
     @BeforeEach
     fun setUp() {
-        hotSpotService = HotSpotService(hotSpotRepository, userRepository, hotSpotMapper)
+        hotSpotService = HotSpotService(hotSpotRepository, hotSpotReportRepository, userRepository, hotSpotMapper)
 
         sampleUser = Users(id = 1L, cognitoSub = "cognito-sub-juan", name = "Juan", email = "j@e.com", number = "123")
 
         sampleHotSpot = HotSpot(
-            id = 10L, latitude = -0.1, longitude = -78.4, modality = "ROBO",
-            description = "Test", peopleInvolved = 2, active = true,
-            expiresAt = LocalDateTime.now().plusHours(2), users = sampleUser
+            id = 10L, latitude = -0.1, longitude = -78.4, active = true,
+            expiresAt = LocalDateTime.now().plusHours(2)
+        )
+
+        sampleReport = HotSpotReport(
+            id = 100L, modality = "ROBO", description = "Test", peopleInvolved = 2,
+            hotSpot = sampleHotSpot, users = sampleUser
         )
 
         sampleRequest = HotSpotRequest(
@@ -59,13 +67,16 @@ class HotSpotServiceTest {
     @Test
     fun `createHotSpot deberia crear y retornar el hotspot`() {
         whenever(userRepository.findById(1L)).doReturn(Optional.of(sampleUser))
-        whenever(hotSpotMapper.toEntity(any<HotSpotRequest>(), any<Users>(), any())).doReturn(sampleHotSpot)
+        whenever(hotSpotMapper.toHotSpotEntity(any<HotSpotRequest>(), any<Long>())).doReturn(sampleHotSpot)
         whenever(hotSpotRepository.save(any())).doReturn(sampleHotSpot)
-        whenever(hotSpotMapper.toResponse(any())).doReturn(sampleResponse)
+        whenever(hotSpotMapper.toReportEntity(any(), any(), any(), any())).doReturn(sampleReport)
+        whenever(hotSpotReportRepository.save(any())).doReturn(sampleReport)
+        whenever(hotSpotMapper.toResponse(any(), anyOrNull())).doReturn(sampleResponse)
 
         val result = hotSpotService.createHotSpot(sampleRequest)
         assertEquals(10L, result.id)
         verify(hotSpotRepository).save(any())
+        verify(hotSpotReportRepository).save(any())
     }
 
     @Test
@@ -77,7 +88,8 @@ class HotSpotServiceTest {
     @Test
     fun `getAllHotSpots deberia retornar solo activos`() {
         whenever(hotSpotRepository.findByActiveTrue()).doReturn(listOf(sampleHotSpot))
-        whenever(hotSpotMapper.toResponse(any())).doReturn(sampleResponse)
+        whenever(hotSpotReportRepository.findByHotSpotIdIn(listOf(10L))).doReturn(listOf(sampleReport))
+        whenever(hotSpotMapper.toResponse(any(), anyOrNull())).doReturn(sampleResponse)
 
         val result = hotSpotService.getAllHotSpots()
         assertEquals(1, result.size)
@@ -87,7 +99,8 @@ class HotSpotServiceTest {
     @Test
     fun `getAllHotSpotsAdmin deberia retornar todos`() {
         whenever(hotSpotRepository.findAll()).doReturn(listOf(sampleHotSpot))
-        whenever(hotSpotMapper.toResponse(any())).doReturn(sampleResponse)
+        whenever(hotSpotReportRepository.findByHotSpotIdIn(listOf(10L))).doReturn(listOf(sampleReport))
+        whenever(hotSpotMapper.toResponse(any(), anyOrNull())).doReturn(sampleResponse)
 
         val result = hotSpotService.getAllHotSpotsAdmin()
         assertEquals(1, result.size)
@@ -97,7 +110,8 @@ class HotSpotServiceTest {
     @Test
     fun `getHotSpotById deberia retornar si existe`() {
         whenever(hotSpotRepository.findById(10L)).doReturn(Optional.of(sampleHotSpot))
-        whenever(hotSpotMapper.toResponse(any())).doReturn(sampleResponse)
+        whenever(hotSpotReportRepository.findByHotSpotId(10L)).doReturn(listOf(sampleReport))
+        whenever(hotSpotMapper.toResponse(any(), anyOrNull())).doReturn(sampleResponse)
 
         val result = hotSpotService.getHotSpotById(10L)
         assertEquals(10L, result.id)
@@ -113,14 +127,17 @@ class HotSpotServiceTest {
     fun `updateHotSpot deberia actualizar y retornar`() {
         whenever(hotSpotRepository.existsById(10L)).doReturn(true)
         whenever(userRepository.findById(1L)).doReturn(Optional.of(sampleUser))
-        // El service real llama: hotSpotMapper.toEntity(request, user, id)
-        whenever(hotSpotMapper.toEntity(any<HotSpotRequest>(), any<Users>(), any<Long>())).doReturn(sampleHotSpot)
+        whenever(hotSpotMapper.toHotSpotEntity(any<HotSpotRequest>(), any<Long>())).doReturn(sampleHotSpot)
         whenever(hotSpotRepository.save(any())).doReturn(sampleHotSpot)
-        whenever(hotSpotMapper.toResponse(any())).doReturn(sampleResponse)
+        whenever(hotSpotReportRepository.findByHotSpotId(10L)).doReturn(listOf(sampleReport))
+        whenever(hotSpotMapper.toReportEntity(any(), any(), any(), any())).doReturn(sampleReport)
+        whenever(hotSpotReportRepository.save(any())).doReturn(sampleReport)
+        whenever(hotSpotMapper.toResponse(any(), anyOrNull())).doReturn(sampleResponse)
 
         val result = hotSpotService.updateHotSpot(10L, sampleRequest)
         assertEquals(10L, result.id)
         verify(hotSpotRepository).save(any())
+        verify(hotSpotReportRepository).save(any())
     }
 
     @Test
@@ -133,7 +150,8 @@ class HotSpotServiceTest {
     fun `deactivateHotSpot deberia guardar con active false`() {
         whenever(hotSpotRepository.findById(10L)).doReturn(Optional.of(sampleHotSpot))
         whenever(hotSpotRepository.save(any())).thenAnswer { it.arguments[0] as HotSpot }
-        whenever(hotSpotMapper.toResponse(any())).doReturn(sampleResponse.copy(active = false))
+        whenever(hotSpotReportRepository.findByHotSpotId(10L)).doReturn(listOf(sampleReport))
+        whenever(hotSpotMapper.toResponse(any(), anyOrNull())).doReturn(sampleResponse.copy(active = false))
 
         val result = hotSpotService.deactivateHotSpot(10L)
         val captor = argumentCaptor<HotSpot>()
@@ -143,9 +161,10 @@ class HotSpotServiceTest {
     }
 
     @Test
-    fun `deleteHotSpot deberia eliminar si existe`() {
+    fun `deleteHotSpot deberia eliminar reportes y el hotspot si existe`() {
         whenever(hotSpotRepository.existsById(10L)).doReturn(true)
         hotSpotService.deleteHotSpot(10L)
+        verify(hotSpotReportRepository).deleteByHotSpotId(10L)
         verify(hotSpotRepository).deleteById(10L)
     }
 

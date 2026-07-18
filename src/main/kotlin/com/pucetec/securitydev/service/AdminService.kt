@@ -6,6 +6,7 @@ import com.pucetec.securitydev.dto.UserCreateRequest
 import com.pucetec.securitydev.dto.UserUpdateRequest
 import com.pucetec.securitydev.entity.Users
 import com.pucetec.securitydev.repository.HotSpotRepository
+import com.pucetec.securitydev.repository.HotSpotReportRepository
 import com.pucetec.securitydev.repository.LocationShareRepository
 import com.pucetec.securitydev.repository.UserRepository
 import org.springframework.stereotype.Service
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service
 class AdminService(
     private val userRepository: UserRepository,
     private val hotSpotRepository: HotSpotRepository,
+    private val hotSpotReportRepository: HotSpotReportRepository,
     private val locationShareRepository: LocationShareRepository,
     private val cognitoAdminService: CognitoAdminService
 ) {
@@ -27,8 +29,6 @@ class AdminService(
         return toUserAdminResponse(user)
     }
 
-    // Crea el usuario primero en Cognito (fuente real de verdad de la identidad),
-    // y solo si eso funciona, guarda el perfil local enlazado por 'sub'.
     fun createUser(request: UserCreateRequest): UserAdminResponse {
         if (userRepository.existsByEmail(request.email)) {
             throw IllegalArgumentException("Ya existe un usuario registrado con ese correo")
@@ -43,7 +43,7 @@ class AdminService(
             name = request.name,
             email = request.email,
             number = request.number,
-            hotSpots = mutableListOf()
+            hotSpotReports = mutableListOf()
         )
         return toUserAdminResponse(userRepository.save(newUser))
     }
@@ -58,12 +58,11 @@ class AdminService(
             name = request.name,
             email = request.email,
             number = request.number,
-            hotSpots = existing.hotSpots
+            hotSpotReports = existing.hotSpotReports
         )
         return toUserAdminResponse(userRepository.save(updated))
     }
 
-    // El reset de contraseña ahora pasa por Cognito, no se toca la base local
     fun resetPassword(id: Long, newPassword: String) {
         val existing = userRepository.findById(id).orElseThrow {
             RuntimeException("Usuario no encontrado con ID: $id")
@@ -82,7 +81,10 @@ class AdminService(
 
     fun getDashboardStats(): DashboardResponse {
         val activeHotspots = hotSpotRepository.findByActiveTrue()
-        val hotspotsByModality = activeHotspots.groupingBy { it.modality }.eachCount()
+        val activeIds = activeHotspots.map { it.id }
+        val hotspotsByModality = hotSpotReportRepository.findByHotSpotIdIn(activeIds)
+            .groupingBy { it.modality }
+            .eachCount()
 
         return DashboardResponse(
             totalUsers = userRepository.count().toInt(),
@@ -98,7 +100,7 @@ class AdminService(
             name = user.name,
             email = user.email,
             number = user.number,
-            hotspotsCount = user.hotSpots.size
+            hotspotsCount = user.hotSpotReports.size
         )
     }
 }
