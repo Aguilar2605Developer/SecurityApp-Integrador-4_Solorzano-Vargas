@@ -84,8 +84,21 @@ class UserService(
                 cognitoService.confirmSignUp(email)
                 cognitoService.getUserSub(email)
             } else {
+                val cleanPassword = password.trim()
+
+                if (cleanPassword.length < 8) {
+                    throw IllegalArgumentException("La contraseña debe tener al menos 8 caracteres.")
+                }
+
+                logger.info(
+                    "Password recibido para {}. longitudOriginal={}, longitudLimpia={}",
+                    email,
+                    password.length,
+                    cleanPassword.length
+                )
+
                 shouldRollbackCognitoUser = true
-                cognitoService.createConfirmedUser(email, name, password)
+                cognitoService.createConfirmedUser(email, name, cleanPassword)
             }
 
             try {

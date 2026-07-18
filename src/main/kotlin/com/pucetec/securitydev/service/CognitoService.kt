@@ -27,6 +27,10 @@ class CognitoService(
     private val logger = LoggerFactory.getLogger(CognitoService::class.java)
 
     fun createConfirmedUser(email: String, name: String, password: String): String {
+        require(password.trim().length >= 8) {
+            "La contraseña temporal es invalida (longitud=${password.length}). Debe tener al menos 8 caracteres sin espacios al inicio/final."
+        }
+
         try {
             val createRequest = AdminCreateUserRequest.builder()
                 .userPoolId(userPoolId)
