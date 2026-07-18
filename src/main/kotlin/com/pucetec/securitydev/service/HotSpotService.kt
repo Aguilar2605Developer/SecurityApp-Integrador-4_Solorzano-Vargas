@@ -11,6 +11,7 @@ import com.pucetec.securitydev.repository.HotSpotRepository
 import com.pucetec.securitydev.repository.UserRepository
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
 
 @Service
@@ -85,6 +86,7 @@ class HotSpotService(
         return hotSpotMapper.toResponse(saved, report)
     }
 
+    @Transactional
     fun deleteHotSpot(id: Long) {
         if (!hotSpotRepository.existsById(id)) {
             throw HotSpotNotFoundException("Punto de peligro no encontrado con ID: $id")

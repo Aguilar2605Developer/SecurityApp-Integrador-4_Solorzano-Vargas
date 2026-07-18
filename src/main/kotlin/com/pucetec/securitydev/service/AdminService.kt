@@ -9,7 +9,10 @@ import com.pucetec.securitydev.repository.HotSpotRepository
 import com.pucetec.securitydev.repository.HotSpotReportRepository
 import com.pucetec.securitydev.repository.LocationShareRepository
 import com.pucetec.securitydev.repository.UserRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException
 
 @Service
 class AdminService(
@@ -19,6 +22,8 @@ class AdminService(
     private val locationShareRepository: LocationShareRepository,
     private val cognitoAdminService: CognitoAdminService
 ) {
+
+    private val logger = LoggerFactory.getLogger(AdminService::class.java)
 
     fun getAllUsers(): List<UserAdminResponse> = userRepository.findAll().map { toUserAdminResponse(it) }
 
@@ -70,12 +75,19 @@ class AdminService(
         cognitoAdminService.resetPassword(existing.email, newPassword)
     }
 
+    @Transactional
     fun deleteUser(id: Long) {
         val existing = userRepository.findById(id).orElseThrow {
             RuntimeException("Usuario no encontrado con ID: $id")
         }
         locationShareRepository.deleteByUsersId(id)
-        cognitoAdminService.deleteUser(existing.email)
+        try {
+            cognitoAdminService.deleteUser(existing.email)
+        } catch (ex: UserNotFoundException) {
+            // Ya no existe en Cognito (borrado manual, desincronización, etc.).
+            // No es un motivo para bloquear la limpieza del registro local.
+            logger.warn("Usuario '{}' no existe en Cognito, se omite y se continua con el borrado local", existing.email)
+        }
         userRepository.deleteById(id)
     }
 
