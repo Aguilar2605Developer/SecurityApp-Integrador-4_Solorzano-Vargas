@@ -53,6 +53,28 @@ class AdminController(
         return ResponseEntity.noContent().build()
     }
 
+    // Limpieza masiva de usuarios huerfanos (borrados manualmente desde la
+    // consola de Cognito). Uso puntual: Postman/curl, no hace falta boton en el front.
+    @PostMapping("/users/purge-orphans")
+    fun purgeOrphanedUsers(): ResponseEntity<Map<String, Any>> {
+        val removed = adminService.purgeOrphanedUsers()
+        return ResponseEntity.ok(
+            mapOf(
+                "message" to "${removed.size} usuario(s) huerfano(s) eliminado(s)",
+                "removedEmails" to removed
+            )
+        )
+    }
+
+    // Trae desde Cognito los usuarios confirmados que no tienen fila local
+    // (BD reseteada, usuario creado directo desde la consola de AWS, etc.)
+    // y los crea. Es la solucion definitiva a la desincronizacion: se puede
+    // llamar cuantas veces sea necesario, solo crea lo que falta.
+    @PostMapping("/users/sync-from-cognito")
+    fun syncUsersFromCognito(): ResponseEntity<SyncFromCognitoResponse> {
+        return ResponseEntity.ok(adminService.syncUsersFromCognito())
+    }
+
     @GetMapping("/hotspots")
     fun getAllHotSpots(): ResponseEntity<List<HotSpotResponse>> {
         return ResponseEntity.ok(hotSpotService.getAllHotSpotsAdmin())

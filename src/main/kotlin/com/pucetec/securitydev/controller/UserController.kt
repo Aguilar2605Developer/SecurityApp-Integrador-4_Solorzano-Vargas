@@ -1,6 +1,8 @@
 package com.pucetec.securitydev.controller
 
+import com.pucetec.securitydev.dto.ConfirmRegistrationRequest
 import com.pucetec.securitydev.dto.RegisterRequest
+import com.pucetec.securitydev.dto.ResendCodeRequest
 import com.pucetec.securitydev.dto.UserRequest
 import com.pucetec.securitydev.dto.UserResponse
 import com.pucetec.securitydev.security.CurrentUser
@@ -34,16 +36,57 @@ class UserController(private val userService: UserService) {
         return ResponseEntity.ok(userService.findOrCreateByCognitoSub(sub, email, name))
     }
 
+    // Paso 1: inicia el SignUp publico en Cognito. Cognito manda el codigo real.
     @PostMapping("/register")
     fun registerUser(@RequestBody request: RegisterRequest): ResponseEntity<Any> {
         return try {
             val userResponse = userService.registerNewUser(request.email, request.name, request.number, request.password)
-            ResponseEntity.status(HttpStatus.CREATED).body(userResponse)
+            ResponseEntity.status(HttpStatus.CREATED).body(
+                mapOf(
+                    "message" to "Cuenta creada. Revisa tu correo e ingresa el codigo para confirmarla.",
+                    "user" to userResponse
+                )
+            )
         } catch (e: IllegalArgumentException) {
             logger.warn("Registro rechazado para {}: {}", request.email, e.message)
             ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("error" to e.message))
         } catch (e: Exception) {
             logger.error("Error procesando POST /api/users/register para {}", request.email, e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                mapOf("error" to (e.message ?: "Error interno del servidor"))
+            )
+        }
+    }
+
+    // Paso 2: confirma con el codigo real que llego al correo. Aqui se crea el usuario local.
+    @PostMapping("/confirm")
+    fun confirmRegistration(@RequestBody request: ConfirmRegistrationRequest): ResponseEntity<Any> {
+        return try {
+            val userResponse = userService.confirmRegistration(request.email, request.code)
+            ResponseEntity.ok(
+                mapOf(
+                    "message" to "Cuenta confirmada. Ya puedes iniciar sesion.",
+                    "user" to userResponse
+                )
+            )
+        } catch (e: IllegalArgumentException) {
+            logger.warn("Confirmacion rechazada para {}: {}", request.email, e.message)
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to e.message))
+        } catch (e: Exception) {
+            logger.error("Error procesando POST /api/users/confirm para {}", request.email, e)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                mapOf("error" to (e.message ?: "Error interno del servidor"))
+            )
+        }
+    }
+
+    @PostMapping("/resend-code")
+    fun resendCode(@RequestBody request: ResendCodeRequest): ResponseEntity<Any> {
+        return try {
+            userService.resendConfirmationCode(request.email)
+            ResponseEntity.ok(mapOf("message" to "Codigo reenviado."))
+        } catch (e: Exception) {
+            logger.error("Error reenviando codigo para {}", request.email, e)
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                 mapOf("error" to (e.message ?: "Error interno del servidor"))
             )

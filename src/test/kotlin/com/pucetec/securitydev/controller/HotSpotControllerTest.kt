@@ -32,6 +32,9 @@ class HotSpotControllerTest {
     @InjectMocks
     private lateinit var hotSpotController: HotSpotController
 
+    // sampleRequest simula lo que manda el CLIENTE, con un userId=1L que puede
+    // no coincidir con el usuario realmente autenticado -- justamente lo que
+    // queremos verificar que el controller ignore y sobreescriba.
     private lateinit var sampleRequest: HotSpotRequest
     private lateinit var ownedResponse: HotSpotResponse
     private lateinit var anonymousResponse: HotSpotResponse
@@ -76,18 +79,45 @@ class HotSpotControllerTest {
         whenever(userService.resolveLocalId(sub)).thenReturn(localId)
     }
 
+    // ---------------------- createHotSpot ----------------------
+
+    @Test
+    fun `createHotSpot deberia forzar el userId del JWT aunque el body traiga otro`() {
+        autenticarComo("cognito-sub-1", 1L)
+        val requestConUserIdAjeno = sampleRequest.copy(userId = 999L)
+        val requestEsperado = sampleRequest.copy(userId = 1L)
+        whenever(hotSpotService.createHotSpot(requestEsperado)).thenReturn(ownedResponse)
+
+        val result = hotSpotController.createHotSpot(requestConUserIdAjeno)
+
+        assertEquals(201, result.statusCode.value())
+        verify(hotSpotService, times(1)).createHotSpot(requestEsperado)
+        verify(hotSpotService, never()).createHotSpot(requestConUserIdAjeno)
+    }
+
+    @Test
+    fun `createHotSpot deberia lanzar AccessDenied si el usuario del JWT no tiene fila local`() {
+        autenticarComo("cognito-sub-huerfano", null)
+
+        assertThrows(AccessDeniedException::class.java) {
+            hotSpotController.createHotSpot(sampleRequest)
+        }
+        verify(hotSpotService, never()).createHotSpot(any())
+    }
+
     // ---------------------- updateHotSpot ----------------------
 
     @Test
     fun `updateHotSpot deberia permitir la edicion cuando el usuario es el dueño`() {
         autenticarComo("cognito-sub-1", 1L)
+        val requestEsperado = sampleRequest.copy(userId = 1L)
         whenever(hotSpotService.getHotSpotById(10L)).thenReturn(ownedResponse)
-        whenever(hotSpotService.updateHotSpot(10L, sampleRequest)).thenReturn(ownedResponse)
+        whenever(hotSpotService.updateHotSpot(10L, requestEsperado)).thenReturn(ownedResponse)
 
         val result = hotSpotController.updateHotSpot(10L, sampleRequest)
 
         assertEquals(200, result.statusCode.value())
-        verify(hotSpotService, times(1)).updateHotSpot(10L, sampleRequest)
+        verify(hotSpotService, times(1)).updateHotSpot(10L, requestEsperado)
     }
 
     @Test
@@ -102,15 +132,67 @@ class HotSpotControllerTest {
     }
 
     @Test
-    fun `updateHotSpot deberia permitir la edicion cuando el hotspot es anonimo (sin dueño)`() {
+    fun `updateHotSpot deberia permitir la edicion cuando el hotspot es anonimo (sin dueño) y asignarlo al editor`() {
         autenticarComo("cognito-sub-2", 2L)
+        val requestEsperado = sampleRequest.copy(userId = 2L)
         whenever(hotSpotService.getHotSpotById(11L)).thenReturn(anonymousResponse)
-        whenever(hotSpotService.updateHotSpot(11L, sampleRequest)).thenReturn(anonymousResponse)
+        whenever(hotSpotService.updateHotSpot(11L, requestEsperado)).thenReturn(anonymousResponse)
 
         val result = hotSpotController.updateHotSpot(11L, sampleRequest)
 
         assertEquals(200, result.statusCode.value())
-        verify(hotSpotService, times(1)).updateHotSpot(11L, sampleRequest)
+        verify(hotSpotService, times(1)).updateHotSpot(11L, requestEsperado)
+    }
+
+    @Test
+    fun `updateHotSpot deberia ignorar el userId ajeno que venga en el body aunque sea el dueño`() {
+        autenticarComo("cognito-sub-1", 1L)
+        val requestConUserIdAjeno = sampleRequest.copy(userId = 999L)
+        val requestEsperado = sampleRequest.copy(userId = 1L)
+        whenever(hotSpotService.getHotSpotById(10L)).thenReturn(ownedResponse)
+        whenever(hotSpotService.updateHotSpot(10L, requestEsperado)).thenReturn(ownedResponse)
+
+        hotSpotController.updateHotSpot(10L, requestConUserIdAjeno)
+
+        verify(hotSpotService, times(1)).updateHotSpot(10L, requestEsperado)
+        verify(hotSpotService, never()).updateHotSpot(10L, requestConUserIdAjeno)
+    }
+
+    // ---------------------- deactivateHotSpot ----------------------
+
+    @Test
+    fun `deactivateHotSpot deberia permitir desactivar cuando el usuario es el dueño`() {
+        autenticarComo("cognito-sub-1", 1L)
+        whenever(hotSpotService.getHotSpotById(10L)).thenReturn(ownedResponse)
+        whenever(hotSpotService.deactivateHotSpot(10L)).thenReturn(ownedResponse.copy(active = false))
+
+        val result = hotSpotController.deactivateHotSpot(10L)
+
+        assertEquals(200, result.statusCode.value())
+        verify(hotSpotService, times(1)).deactivateHotSpot(10L)
+    }
+
+    @Test
+    fun `deactivateHotSpot deberia lanzar AccessDenied cuando el usuario NO es el dueño`() {
+        autenticarComo("cognito-sub-2", 2L)
+        whenever(hotSpotService.getHotSpotById(10L)).thenReturn(ownedResponse)
+
+        assertThrows(AccessDeniedException::class.java) {
+            hotSpotController.deactivateHotSpot(10L)
+        }
+        verify(hotSpotService, never()).deactivateHotSpot(any())
+    }
+
+    @Test
+    fun `deactivateHotSpot deberia permitir desactivar un hotspot anonimo (sin dueño)`() {
+        autenticarComo("cognito-sub-2", 2L)
+        whenever(hotSpotService.getHotSpotById(11L)).thenReturn(anonymousResponse)
+        whenever(hotSpotService.deactivateHotSpot(11L)).thenReturn(anonymousResponse.copy(active = false))
+
+        val result = hotSpotController.deactivateHotSpot(11L)
+
+        assertEquals(200, result.statusCode.value())
+        verify(hotSpotService, times(1)).deactivateHotSpot(11L)
     }
 
     // ---------------------- deleteHotSpot ----------------------

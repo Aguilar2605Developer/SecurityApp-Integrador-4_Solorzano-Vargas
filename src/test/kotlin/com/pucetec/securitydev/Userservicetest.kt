@@ -4,6 +4,8 @@ import com.pucetec.securitydev.dto.UserRequest
 import com.pucetec.securitydev.dto.UserResponse
 import com.pucetec.securitydev.entity.Users
 import com.pucetec.securitydev.mappers.UserMapper
+import com.pucetec.securitydev.repository.LocationShareRecipientRepository
+import com.pucetec.securitydev.repository.LocationShareRepository
 import com.pucetec.securitydev.repository.UserRepository
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -26,6 +28,12 @@ class UserServiceTest {
 
     @Mock
     private lateinit var cognitoService: CognitoService
+
+    @Mock
+    private lateinit var locationShareRepository: LocationShareRepository
+
+    @Mock
+    private lateinit var locationShareRecipientRepository: LocationShareRecipientRepository
 
     @InjectMocks
     private lateinit var userService: UserService
@@ -67,6 +75,7 @@ class UserServiceTest {
     @Test
     fun `findOrCreateByCognitoSub deberia crear el usuario si el sub no existe`() {
         whenever(userRepository.findByCognitoSub("sub-nuevo")).thenReturn(null)
+        whenever(userRepository.findByEmail("nuevo@example.com")).thenReturn(null)
         whenever(userRepository.save(any<Users>())).thenAnswer { it.arguments[0] as Users }
         whenever(userMapper.toResponse(any<Users>())).thenReturn(sampleResponse)
 
@@ -157,25 +166,47 @@ class UserServiceTest {
     }
 
     // ---------------------- deleteUser ----------------------
+    // deleteUser ahora sigue el mismo orden que AdminService.deleteUser: primero
+    // rompe la referencia en location_share_recipient, luego borra los
+    // location_share del usuario, luego intenta borrar en Cognito (sin bloquear
+    // el borrado local si ya no existe ahi), y al final borra la fila local.
 
     @Test
-    fun `deleteUser deberia eliminar el usuario y devolver true cuando existe`() {
-        whenever(userRepository.existsById(1L)).thenReturn(true)
+    fun `deleteUser deberia borrar en cascada, borrar en Cognito y devolver true cuando existe`() {
+        whenever(userRepository.findById(1L)).thenReturn(Optional.of(sampleEntity))
 
         val result = userService.deleteUser(1L)
 
         assertTrue(result)
+        verify(locationShareRecipientRepository, times(1)).deleteByLocationShareUsersId(1L)
+        verify(locationShareRepository, times(1)).deleteByUsersId(1L)
+        verify(cognitoService, times(1)).deleteUserIfExists(sampleEntity.email)
         verify(userRepository, times(1)).deleteById(1L)
     }
 
     @Test
     fun `deleteUser deberia devolver false cuando el usuario no existe`() {
-        whenever(userRepository.existsById(99L)).thenReturn(false)
+        whenever(userRepository.findById(99L)).thenReturn(Optional.empty())
 
         val result = userService.deleteUser(99L)
 
         assertFalse(result)
+        verify(locationShareRecipientRepository, never()).deleteByLocationShareUsersId(any())
+        verify(locationShareRepository, never()).deleteByUsersId(any())
+        verify(cognitoService, never()).deleteUserIfExists(any())
         verify(userRepository, never()).deleteById(any<Long>())
+    }
+
+    @Test
+    fun `deleteUser deberia borrar la fila local aunque Cognito falle`() {
+        whenever(userRepository.findById(1L)).thenReturn(Optional.of(sampleEntity))
+        whenever(cognitoService.deleteUserIfExists(sampleEntity.email))
+            .thenThrow(RuntimeException("Cognito no disponible"))
+
+        val result = userService.deleteUser(1L)
+
+        assertTrue(result)
+        verify(userRepository, times(1)).deleteById(1L)
     }
 
     // ---------------------- resolveLocalId ----------------------

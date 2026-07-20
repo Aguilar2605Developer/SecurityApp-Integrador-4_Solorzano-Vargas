@@ -44,9 +44,15 @@ class LocationShareService(
     }
 
     fun getByShareId(shareId: String): LocationShareResponse {
-        val share = locationShareRepository.findByShareId(shareId)
-            ?: throw LocationShareNotFoundException("Compartir ubicación no encontrado: $shareId")
+        val share = getEntityByShareId(shareId)
         return locationShareMapper.toResponse(share)
+    }
+
+    // Devuelve la entidad completa (no el DTO) para poder vincular destinatarios,
+    // comparar el dueño real, etc.
+    fun getEntityByShareId(shareId: String): LocationShare {
+        return locationShareRepository.findByShareId(shareId)
+            ?: throw LocationShareNotFoundException("Compartir ubicación no encontrado: $shareId")
     }
 
     fun stopSharing(shareId: String): LocationShareResponse {

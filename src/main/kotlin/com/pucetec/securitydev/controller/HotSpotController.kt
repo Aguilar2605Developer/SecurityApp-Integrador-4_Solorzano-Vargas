@@ -18,9 +18,14 @@ class HotSpotController(
     private val userService: UserService
 ) {
 
+    // El userId del reporte SIEMPRE se toma del JWT, nunca del body: antes
+    // request.userId venia tal cual del cliente, asi que cualquiera podia
+    // crear un reporte "a nombre" de otro usuario con solo cambiar ese campo.
     @PostMapping
     fun createHotSpot(@RequestBody request: HotSpotRequest): ResponseEntity<HotSpotResponse> {
-        val savedHotSpot = hotSpotService.createHotSpot(request)
+        val currentLocalId = requireCurrentLocalId()
+        val safeRequest = request.copy(userId = currentLocalId)
+        val savedHotSpot = hotSpotService.createHotSpot(safeRequest)
         return ResponseEntity(savedHotSpot, HttpStatus.CREATED)
     }
 
@@ -37,26 +42,47 @@ class HotSpotController(
     @PutMapping("/{id}")
     fun updateHotSpot(@PathVariable id: Long, @RequestBody request: HotSpotRequest): ResponseEntity<HotSpotResponse> {
         val existing = hotSpotService.getHotSpotById(id)
-        val currentLocalId = userService.resolveLocalId(CurrentUser.sub())
+        val currentLocalId = requireCurrentLocalId()
         if (existing.userId != null && existing.userId != currentLocalId) {
             throw AccessDeniedException("No puedes editar un punto de peligro de otro usuario")
         }
-        return ResponseEntity.ok(hotSpotService.updateHotSpot(id, request))
+        // Igual que en createHotSpot: el userId final del reporte es siempre el
+        // del usuario autenticado, nunca el que venga en el body (evita que se
+        // reasigne un reporte propio a otro userId arbitrario).
+        val safeRequest = request.copy(userId = currentLocalId)
+        return ResponseEntity.ok(hotSpotService.updateHotSpot(id, safeRequest))
     }
 
+    // Antes este endpoint no verificaba dueño en absoluto: cualquier usuario
+    // autenticado podia desactivar (silenciar) el reporte de peligro de
+    // cualquier otro usuario. Ahora sigue la misma regla que update/delete.
     @PutMapping("/{id}/deactivate")
     fun deactivateHotSpot(@PathVariable id: Long): ResponseEntity<HotSpotResponse> {
+        val existing = hotSpotService.getHotSpotById(id)
+        val currentLocalId = requireCurrentLocalId()
+        if (existing.userId != null && existing.userId != currentLocalId) {
+            throw AccessDeniedException("No puedes desactivar un punto de peligro de otro usuario")
+        }
         return ResponseEntity.ok(hotSpotService.deactivateHotSpot(id))
     }
 
     @DeleteMapping("/{id}")
     fun deleteHotSpot(@PathVariable id: Long): ResponseEntity<Void> {
         val existing = hotSpotService.getHotSpotById(id)
-        val currentLocalId = userService.resolveLocalId(CurrentUser.sub())
+        val currentLocalId = requireCurrentLocalId()
         if (existing.userId != null && existing.userId != currentLocalId) {
             throw AccessDeniedException("No puedes eliminar un punto de peligro de otro usuario")
         }
         hotSpotService.deleteHotSpot(id)
         return ResponseEntity.noContent().build()
+    }
+
+    // Centraliza la resolucion del usuario local a partir del JWT. Si el token
+    // es valido pero todavia no hay fila local sincronizada (caso raro: JWT
+    // valido sin paso previo por /api/users/sync), se rechaza en vez de dejar
+    // pasar un userId nulo o inventado.
+    private fun requireCurrentLocalId(): Long {
+        return userService.resolveLocalId(CurrentUser.sub())
+            ?: throw AccessDeniedException("No se pudo verificar tu usuario. Vuelve a iniciar sesión.")
     }
 }

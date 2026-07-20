@@ -19,4 +19,13 @@ object CurrentUser {
         val principal = SecurityContextHolder.getContext().authentication?.principal
         return if (principal is Jwt) principal.getClaimAsString("name") else null
     }
+
+    /**
+     * true solo si Cognito confirmo el correo con un codigo real. Es la
+     * garantia que usamos para decidir quien puede ver una ubicacion compartida.
+     */
+    fun emailVerified(): Boolean {
+        val principal = SecurityContextHolder.getContext().authentication?.principal
+        return if (principal is Jwt) principal.getClaimAsBoolean("email_verified") ?: false else false
+    }
 }

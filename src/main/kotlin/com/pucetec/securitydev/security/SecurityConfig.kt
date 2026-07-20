@@ -49,9 +49,16 @@ class SecurityConfig {
             .authorizeHttpRequests {
                 it.requestMatchers(HttpMethod.GET, "/api/health", "/api/health/**").permitAll()
                 it.requestMatchers(HttpMethod.GET, "/api/hotspots", "/api/hotspots/**").permitAll()
-                it.requestMatchers(HttpMethod.GET, "/api/location-shares/*").permitAll()
-                it.requestMatchers(HttpMethod.POST, "/api/location-shares/*/share-email").permitAll()
-                it.requestMatchers(HttpMethod.POST, "/api/users/register").permitAll()
+
+                it.requestMatchers(
+                    HttpMethod.POST,
+                    "/api/users/register",
+                    "/api/users/confirm",
+                    "/api/users/resend-code"
+                ).permitAll()
+
+                // location-shares deja de ser publico: la autorizacion se decide
+                // comparando el email del token contra la tabla de destinatarios.
                 it.requestMatchers("/api/admin/**").hasRole("ADMIN")
                 it.anyRequest().authenticated()
             }

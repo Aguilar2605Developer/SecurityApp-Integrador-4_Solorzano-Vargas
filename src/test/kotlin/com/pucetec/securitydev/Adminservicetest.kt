@@ -7,6 +7,7 @@ import com.pucetec.securitydev.entity.HotSpotReport
 import com.pucetec.securitydev.entity.Users
 import com.pucetec.securitydev.repository.HotSpotRepository
 import com.pucetec.securitydev.repository.HotSpotReportRepository
+import com.pucetec.securitydev.repository.LocationShareRecipientRepository
 import com.pucetec.securitydev.repository.LocationShareRepository
 import com.pucetec.securitydev.repository.UserRepository
 import org.junit.jupiter.api.Assertions.*
@@ -39,7 +40,13 @@ class AdminServiceTest {
     lateinit var locationShareRepository: LocationShareRepository
 
     @Mock
+    lateinit var locationShareRecipientRepository: LocationShareRecipientRepository
+
+    @Mock
     lateinit var cognitoAdminService: CognitoAdminService
+
+    @Mock
+    lateinit var cognitoService: CognitoService
 
     private lateinit var adminService: AdminService
 
@@ -52,7 +59,9 @@ class AdminServiceTest {
             hotSpotRepository,
             hotSpotReportRepository,
             locationShareRepository,
-            cognitoAdminService
+            locationShareRecipientRepository,
+            cognitoAdminService,
+            cognitoService
         )
 
         sampleUser = Users(
@@ -223,6 +232,7 @@ class AdminServiceTest {
 
         adminService.deleteUser(1L)
 
+        verify(locationShareRecipientRepository, times(1)).deleteByLocationShareUsersId(1L)
         verify(locationShareRepository, times(1)).deleteByUsersId(1L)
         verify(cognitoAdminService, times(1)).deleteUser(sampleUser.email)
         verify(userRepository, times(1)).deleteById(1L)
@@ -235,6 +245,7 @@ class AdminServiceTest {
         assertThrows(RuntimeException::class.java) {
             adminService.deleteUser(99L)
         }
+        verify(locationShareRecipientRepository, never()).deleteByLocationShareUsersId(any())
         verify(locationShareRepository, never()).deleteByUsersId(any())
         verify(cognitoAdminService, never()).deleteUser(any())
         verify(userRepository, never()).deleteById(any())
